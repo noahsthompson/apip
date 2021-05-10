@@ -1,9 +1,0 @@
-Noah Thompson
-Review of Programmable Packet Scheduling at Line Rate
-
-Overview:
-This paper outlined a promising abstraction implementable at the hardware level that supports various types of scheduling schemes. The key concept here is the PIFO or "push-in first-out queue." This queue allows for insertion based on some sort of arbitrary notion of a rank. All the elements of the queue must have a rank that can be calculated/compared on various metrics. This basically allows for a bunch of orderings corresponding to various features of the packet.
-
-Overall this paper did a pretty good job with the scope. It picked a relatively simple concept but really thought through it and touched on how the PIFO could be used. It also touched into the software side with various sample implementations for different types of schedulings, as well as the hardware side with an efficient implementation of PIFO's. However it didn't really have many industry benchmarks or even interviews with members from industry. With networking, one really important thing is cross-compatibility and ease f adoption. More exploration of that would seem to be valuable.
-
-To be honest some of the hardware side stuff went over my head. I also think more comparisons with other ppapers and approaches of line-rate switches could be helpful to situate the discussion I assume the authors are trying to create. 
