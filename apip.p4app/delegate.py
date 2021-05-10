@@ -54,8 +54,14 @@ def respond_pkt(pkt):
         # brief(pkt) = clientID || Fingerprint(pkt) || MAC_K_SD_S(clientID || Fingerprint(pkt))
         pass
     elif isVerify(pkt):
-        # if hashed pkt hits bloom filter, send OK
-        pass
+        # check:
+        # 1. delegate has received a brief from S containing Fingerprint(pkt)
+        # 2. accAddr in pkt is using an SID assigned to S
+        # 3. transmission from S to R has not been blocked via a shutoff
+
+        # OK: return a copy of the verification packet signed with its private key to verifier (it will add S -> R to its whitelist).
+        resp = Apip(src=p[IP].dst, dst=p[IP].src)
+        send(resp, verbose=False)
     elif isShutoff(pkt):
         # shutoff the flow that pkt is from
         pass
@@ -63,19 +69,12 @@ def respond_pkt(pkt):
 
 
 def main():
-    # if len(sys.argv)<3:
-    #     print('usage: acc.py <source> <destination>')
-    #     exit(1)
     iface = get_if()
     while True:
         sniff(iface=iface, prn=respond_pkt)
 
-    # src = socket.gethostbyname(sys.argv[1])
-    # dst = socket.gethostbyname(sys.argv[2])
-    # print("sending on interface %s for %s <-> %s traffic" % (iface, src, dst))
+    # src, dst = socket.gethostbyname(sys.argv[1]), socket.gethostbyname(sys.argv[2])
     # pkt =  Ether(src=get_if_hwaddr(iface), dst='ff:ff:ff:ff:ff:ff') / Apip(dstAddr=dst, accAddr=dst, result = 0)
-    # pkt = srp1(pkt, iface=iface, verbose=False)
-    # print_pkt(pkt[0][1])    
 
 if __name__ == '__main__':
     main()
