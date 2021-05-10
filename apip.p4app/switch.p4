@@ -7,20 +7,27 @@ header ethernet_t {
     bit<16> etherType;
 }
 
-header regex_t {
-    bit<16> state;
-    bit<7> length;
-    bit<1> result;
+header apip_flag_t {
+    bit<4> flag;
 }
 
-header next_chars_t {
-    bit <8> nc;
+header apip_t {
+    bit<16> accAddr;
+    bit<16> retAddr;
+    bit<32> dstAddr;
+}
+
+header verif_info_t {
+    bit <64> fingerprint;
+    bit <64> msg_auth;
 }
 
 struct headers {
     ethernet_t ethernet;
-    regex_t regex;
-    next_chars_t next_chars;
+    apip_flag_t apip_flag;
+    apip_t apip;
+    verif_info_t verif_info;
+
 } 
 
 struct metadata {
@@ -28,23 +35,35 @@ struct metadata {
 
 parser MyParser(packet_in packet, out headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
     state start {
-	transition parse_ethernet;
+	    transition parse_ethernet;
     }
     state parse_ethernet {
     	packet.extract(hdr.ethernet);
-	transition select (hdr.ethernet.etherType) {
-	    16w0x9999: parse_regex;
-	    default: accept;
-	}
+        transition select (hdr.ethernet.etherType) {
+            16w0x87DD: parse_apip_flag;
+            default: accept;
+        }
     }
-    state parse_regex {
-	packet.extract(hdr.regex);
-	transition parse_next_chars;
+    state parse_apip_flag {
+        packet.extract(hdr.apip_flag);
+        transition select (hdr.apip_flag.flag) {
+            4w0x1: parse_apip;
+            4w0x3: parse_verif_info;
+            4w0x4: parse_verif_info;
+            default: accept;    
+        }
     }
-    state parse_next_chars {
-	packet.extract(hdr.next_chars);
-	transition accept;
+    state parse_apip {
+        packet.extract(hdr.apip);
+        transition: accept;
+
     }
+    state parse_verif_info{
+        packet.extract(hdr.verif_info);
+        transition: accept;
+
+    }
+
     
 }
 
@@ -54,7 +73,6 @@ control MyVerifyChecksum(inout headers hdr, inout metadata meta) {
 }
 
 control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
-    bit<16> null = 16w0xFF;
 
     action _drop() {
         mark_to_drop(standard_metadata);
