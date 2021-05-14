@@ -4,6 +4,8 @@ import sys
 import socket
 import random
 import struct
+from enum import Enum
+from threading import Timer
 
 from scapy.all import srp1, get_if_list, get_if_hwaddr, bind_layers
 from scapy.all import Packet
@@ -11,71 +13,102 @@ from scapy.all import Ether
 from scapy.fields import *
 import readline
 
-def get_if():
-    ifs=get_if_list()
-    iface=None
-    for i in get_if_list():
-        if "eth0" in i:
-            iface=i
-            break;
-    if not iface:
-        print("Cannot find eth0 interface")
-        exit(1)
-    return iface
+
+class ApipFlag(Enum):
+    PACKET = 1
+    BRIEF = 2
+    VERIFY_REQ = 3
+    VERIFY_RES = 4
+    SHUTOFF = 5
 
 class Apip(Packet):
-   fields_desc = [ Emph(IPField("srcAddr", "127.0.0.1")),
-                   Emph(IPField("dstAddr", "127.0.0.1")),
-                   IPField("accAddr", "127.0.0.1")]
+   fields_desc = [BitField("flag", 0, 4),
+                    IPField("src", "127.0.0.1"),
+                    IPField("acc", "127.0.0.1")]
 
-bind_layers(Ether, Apip, type=0x9999)
+bind_layers(Ether, Apip, type=0x87DD)
 
-def print_pkt(pkt):
-    pkt.show2()
-    sys.stdout.flush()
+class Delegate(object):
+    BRIEF_PERIOD = 30
 
-def isApip(pkt):
-    pkt.hasLayer(Apip)
+    def __init__(self, clients):
+        self.clients = set(clients)
+        self.assigned_sids = {} # map: clientID -> set/list of sids
+        self.briefs = {} # map: clientID -> set of bloom filters
+        self.timers = {} # map: clientID -> set of timers
+        self.blocked = set() # set of flow identifiers (client_id, dst_ip, client_sid, dst_sid)
 
-def isBrief(pkt):
-    return False
+    def get_if(self):
+        ifs=get_if_list()
+        iface=None
+        for i in get_if_list():
+            if "eth0" in i:
+                iface=i
+                break
+        if not iface:
+            print("Cannot find eth0 interface")
+            exit(1)
+        return iface
 
-def isVerify(pkt):
-    return False
+    def print_pkt(self, pkt):
+        pkt.show2()
+        sys.stdout.flush()
 
-def isShutoff(pkt):
-    return False
+    def send_drop_flow(self, pkt):
+        drop_flow = Apip() # TODO: define drop_flow
+        drop_flow = Ether(src=get_if_hwaddr(iface), dst=pkt[Ether].src) / drop_flow
+        send(drop_flow, verbose=False)
 
-def respond_pkt(pkt):
-    if not isApip(pkt):
-        return
-    print_pkt(pkt[0][1])
-    if isBrief(pkt):
-        # brief(pkt) = clientID || Fingerprint(pkt) || MAC_K_SD_S(clientID || Fingerprint(pkt))
-        pass
-    elif isVerify(pkt):
-        # if hashed pkt hits bloom filter, send OK
-        pass
-    elif isShutoff(pkt):
-        # shutoff the flow that pkt is from
-        pass
+    def respond_pkt(self, pkt):
+        if not isApip(pkt):
+            return
+        print_pkt(pkt[0][1])
 
+        flag = pkt[Apip].flag
+        acc = pkt[Apip].acc
+        # TODO: how to extract
+        client_id = None
+        dst_ip = None
+        client_sid = None
+        dst_sid = None        
+        flow_id = (client_id, dst_ip, client_sid, dst_sid)
 
+        if flag == ApipFlag.BRIEF: # brief(pkt) = clientID || Fingerprint(pkt) || MAC_K_SD_S(clientID || Fingerprint(pkt))
+            # TODO: check client valid, extract bloom_filter
+            bloom_filter = None
+            self.briefs[flow_id].add(bloom_filter)
+            # TODO: set 30s timeout action
+            return
+        
+        if flag == ApipFlag.VERIFY_REQ:
+            # 1. Check delegate has received a brief from S containing Fingerprint(pkt)
+            if bloom_filter not in self.briefs[client_id]:
+                self.send_drop_flow(pkt)
+                return
+            # 2. Check accAddr in pkt is using an SID assigned to S
+            if client_sid not in self.assigned_sids[client_id]:
+                self.send_drop_flow(pkt)
+                return
+            # 3. Check transmission from S to R has not been blocked via a shutoff
+            if flow_id in self.blocked:
+                self.send_drop_flow(pkt)
+                return
 
-def main():
-    # if len(sys.argv)<3:
-    #     print('usage: acc.py <source> <destination>')
-    #     exit(1)
-    iface = get_if()
-    while True:
-        sniff(iface=iface, prn=respond_pkt)
+            # Return copy of the verification packet signed with private key to verifier V (V will add S -> R to its whitelist).
+            # same fingerprint, key = something
+            resp = Apip(flag=pkt[Apip].flag, dst=pkt[Apip].src, acc=pkt[Apip].acc)
+            resp = Ether(src=get_if_hwaddr(iface), dst=pkt[Ether].src) / resp
+            send(resp, verbose=False)
 
-    # src = socket.gethostbyname(sys.argv[1])
-    # dst = socket.gethostbyname(sys.argv[2])
-    # print("sending on interface %s for %s <-> %s traffic" % (iface, src, dst))
-    # pkt =  Ether(src=get_if_hwaddr(iface), dst='ff:ff:ff:ff:ff:ff') / Apip(dstAddr=dst, accAddr=dst, result = 0)
-    # pkt = srp1(pkt, iface=iface, verbose=False)
-    # print_pkt(pkt[0][1])    
+        if flag == ApipFlag.SHUTOFF:
+            self.blocked.add(flow_id)
+
+    def main(self):
+        iface = self.get_if()
+        while True:
+            sniff(iface=iface, prn=self.respond_pkt)
 
 if __name__ == '__main__':
-    main()
+    clients = [socket.gethostbyname(h) for h in sys.argv[1]]
+    d = Delegate(clients)
+    d.main()
