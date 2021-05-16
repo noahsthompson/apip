@@ -117,8 +117,12 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     }
 
     action send_verification_request(){
+        hdr.apip.setInvalid();
+        hdr.verify.setValid();
         hdr.apip_flag.flag = 8w0x3;
         hdr.ethernet.dstAddr = (bit<48>) hdr.apip.accAddr;
+        hdr.verify.fingerprint = fingerprint;
+        hdr.verify.msg_auth = signature;
     }
 
     action check_bloom(){
@@ -221,7 +225,29 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 }
 
 control MyEgress(inout headers hdr, inout metadata meta, inout standard_metadata_t standard_metadata) {
-    apply { }
+    action rewrite_mac(bit<48> smac) {
+        hdr.ethernet.srcAddr = smac;
+    }
+    action _drop() {
+        mark_to_drop(standard_metadata);
+    }
+    table send_frame {
+        actions = {
+            rewrite_mac;
+            _drop;
+            NoAction;
+        }
+        key = {
+            standard_metadata.egress_port: exact;
+        }
+        size = 256;
+        default_action = _drop();
+    }
+    apply {
+        if ((hdr.apip_flag.flag == 1) || (hdr.apip_flag.flag == 3)) {
+          send_frame.apply();
+        }
+    }
 }
 
 control MyComputeChecksum(inout headers hdr, inout metadata meta) {
@@ -231,6 +257,9 @@ control MyComputeChecksum(inout headers hdr, inout metadata meta) {
 control MyDeparser(packet_out packet, in headers hdr) {
     apply { 
         packet.emit(hdr.ethernet);
+        packet.emit(hdr.apip_flag);
+        packet.emit(hdr.apip);
+        packet.emit(hdr.verify);
     }
 }
 
