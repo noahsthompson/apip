@@ -14,7 +14,7 @@ from scapy.fields import *
 import readline
 
 
-class ApipFlag(Enum):
+class ApipFlagNum(Enum):
     PACKET = 1
     BRIEF = 2
     VERIFY_REQ = 3
@@ -82,14 +82,14 @@ class Delegate(object):
         print_pkt(pkt[0][1])
         flag = pkt[ApipFlag].flag
 
-        if flag == ApipFlag.BRIEF:
+        if flag == ApipFlagNum.BRIEF:
             # TODO: check client valid (bootstrapping)
             bloom_filter = pkt[Brief].bloom
             self.briefs[pkt[Brief].host_id].add(bloom_filter)
             # TODO: set 30s timeout action
             return
         
-        if flag == ApipFlag.VERIFY_REQ:
+        if flag == ApipFlagNum.VERIFY_REQ:
             # 1. Check delegate has received a brief from client containing Fingerprint(pkt)
             fingerprint = pkt[Verify].fingerprint
             client_id = None
@@ -117,7 +117,7 @@ class Delegate(object):
             resp = Ether(src=get_if_hwaddr(iface), dst=pkt[Ether].src) / resp
             send(resp, verbose=False)
 
-        if flag == ApipFlag.SHUTOFF:
+        if flag == ApipFlagNum.SHUTOFF:
             self.blocked.add(flow_id)
 
     def main(self):
