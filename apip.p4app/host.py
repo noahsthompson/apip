@@ -15,6 +15,9 @@ from delegate import ApipFlagNum, ApipFlag, Apip, Brief, get_if, print_pkt
 
 bind_layers(Ether, ApipFlag, type=0x87DD)
 
+def half_addr_to_long(lst): # assuming lst has 2 elements
+    return 256 * int(lst[0]) + int(lst[1])
+
 def main():
     if len(sys.argv)<3:
         print('usage: host.py <source> <destination> <delegate>')
@@ -28,15 +31,15 @@ def main():
     acc_quadrants = socket.gethostbyname(sys.argv[3]).split('.')
     pkt =  Ether(src=get_if_hwaddr(iface), dst='ff:ff:ff:ff:ff:ff')
     pkt = pkt / ApipFlag(flag=ApipFlagNum.PACKET.value)
-    pkt = pkt / Apip(accAddr='.'.join(acc_quadrants[:2]), retAddr='.'.join(acc_quadrants[2:]), dstAddr=dst)
+    pkt = pkt / Apip(accAddr=half_addr_to_long(acc_quadrants[:2]), retAddr=half_addr_to_long(acc_quadrants[2:]), dstAddr=dst)
     
     # send brief
     brf = Ether(src=get_if_hwaddr(iface), dst='ff:ff:ff:ff:ff:ff')
     brf = brf / ApipFlag(flag=ApipFlagNum.BRIEF.value)
     brf = brf / Brief(host_id=int(src.split('.')[2]), bloom=0)
     
-    sendp(pkt)
     sendp(brf)
+    sendp(pkt)
     # pkt = srp1(pkt, iface=iface, verbose=False)
     # print_pkt(pkt[0][1])    
 

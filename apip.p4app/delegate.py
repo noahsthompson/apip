@@ -76,10 +76,19 @@ class Delegate(object):
         drop_flow = Ether(src=get_if_hwaddr(iface), dst=pkt[Ether].src) / drop_flow
         send(drop_flow, verbose=False)
 
+    def send_verified(self, pkt):
+        resp = Verify(fingerprint=pkt[Verify].fingerprint, msg_auth=pkt[Verify].msg_auth)
+        resp = ApipFlag(flag=pkt[ApipFlag].flag) / resp
+        resp = Ether(src=get_if_hwaddr(iface), dst=pkt[Ether].src) / resp
+        send(resp, verbose=False)
+
     def respond_pkt(self, pkt):
+        print_pkt('PACKET RECEIVED')
         if not isApip(pkt):
             return
         print_pkt(pkt[0][1])
+        self.send_verified(pkt) # FOR TESTING
+
         flag = pkt[ApipFlag].flag
 
         if flag == ApipFlagNum.BRIEF.value:
@@ -112,10 +121,7 @@ class Delegate(object):
 
             # Return copy of the verification packet signed with private key to verifier V (V will add S -> R to its whitelist).
             # same fingerprint, key = something
-            resp = Verify(fingerprint=pkt[Verify].fingerprint, msg_auth=pkt[Verify].msg_auth)
-            resp = ApipFlag(flag=pkt[ApipFlag].flag) / resp
-            resp = Ether(src=get_if_hwaddr(iface), dst=pkt[Ether].src) / resp
-            send(resp, verbose=False)
+            self.send_verified(pkt)
 
         if flag == ApipFlagNum.SHUTOFF.value:
             self.blocked.add(flow_id)
