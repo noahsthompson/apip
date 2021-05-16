@@ -22,7 +22,7 @@ class ApipFlagNum(Enum):
     SHUTOFF = 5
 
 class ApipFlag(Packet):
-   fields_desc = [BitField("flag", 0, 4)]
+   fields_desc = [BitField("flag", 0, 8)]
 
 class Apip(Packet):
    fields_desc = [
@@ -45,6 +45,22 @@ class Verify(Packet):
 
 bind_layers(Ether, ApipFlag, type=0x87DD)
 
+def get_if(self):
+    ifs=get_if_list()
+    iface=None
+    for i in get_if_list():
+        if "eth0" in i:
+            iface=i
+            break
+    if not iface:
+        print("Cannot find eth0 interface")
+        exit(1)
+    return iface
+
+def print_pkt(pkt):
+    pkt.show2()
+    sys.stdout.flush()
+
 class Delegate(object):
     BRIEF_PERIOD = 30
 
@@ -54,22 +70,6 @@ class Delegate(object):
         self.briefs = {} # map: clientID -> set of bloom filters
         self.timers = {} # map: clientID -> set of timers
         self.blocked = set() # set of flow identifiers (client_id, dst_ip, client_sid, dst_sid)
-
-    def get_if(self):
-        ifs=get_if_list()
-        iface=None
-        for i in get_if_list():
-            if "eth0" in i:
-                iface=i
-                break
-        if not iface:
-            print("Cannot find eth0 interface")
-            exit(1)
-        return iface
-
-    def print_pkt(self, pkt):
-        pkt.show2()
-        sys.stdout.flush()
 
     def send_drop_flow(self, pkt):
         drop_flow = Apip() # TODO: define drop_flow
@@ -121,11 +121,11 @@ class Delegate(object):
             self.blocked.add(flow_id)
 
     def main(self):
-        iface = self.get_if()
+        iface = get_if()
         while True:
             sniff(iface=iface, prn=self.respond_pkt)
 
 if __name__ == '__main__':
-    clients = [socket.gethostbyname(h) for h in sys.argv[1]]
+    clients = [socket.gethostbyname(h) for h in eval(sys.argv[1])]
     d = Delegate(clients)
     d.main()
