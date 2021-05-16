@@ -3,7 +3,7 @@
   "language": "p4-16",
   "targets": {
     "mininet": {
-	"num-hosts": 1,
+	"num-hosts": 3,
 	"switch-config": "switch.config"	
     }
   }

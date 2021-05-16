@@ -7,7 +7,7 @@ import struct
 from enum import Enum
 from threading import Timer
 
-from scapy.all import srp1, get_if_list, get_if_hwaddr, bind_layers
+from scapy.all import srp1, sniff, get_if_list, get_if_hwaddr, bind_layers
 from scapy.all import Packet
 from scapy.all import Ether
 from scapy.fields import *
@@ -45,7 +45,7 @@ class Verify(Packet):
 
 bind_layers(Ether, ApipFlag, type=0x87DD)
 
-def get_if(self):
+def get_if():
     ifs=get_if_list()
     iface=None
     for i in get_if_list():
@@ -82,14 +82,14 @@ class Delegate(object):
         print_pkt(pkt[0][1])
         flag = pkt[ApipFlag].flag
 
-        if flag == ApipFlagNum.BRIEF:
+        if flag == ApipFlagNum.BRIEF.value:
             # TODO: check client valid (bootstrapping)
             bloom_filter = pkt[Brief].bloom
             self.briefs[pkt[Brief].host_id].add(bloom_filter)
             # TODO: set 30s timeout action
             return
         
-        if flag == ApipFlagNum.VERIFY_REQ:
+        if flag == ApipFlagNum.VERIFY_REQ.value:
             # 1. Check delegate has received a brief from client containing Fingerprint(pkt)
             fingerprint = pkt[Verify].fingerprint
             client_id = None
@@ -117,7 +117,7 @@ class Delegate(object):
             resp = Ether(src=get_if_hwaddr(iface), dst=pkt[Ether].src) / resp
             send(resp, verbose=False)
 
-        if flag == ApipFlagNum.SHUTOFF:
+        if flag == ApipFlagNum.SHUTOFF.value:
             self.blocked.add(flow_id)
 
     def main(self):
@@ -126,6 +126,7 @@ class Delegate(object):
             sniff(iface=iface, prn=self.respond_pkt)
 
 if __name__ == '__main__':
-    clients = [socket.gethostbyname(h) for h in eval(sys.argv[1])]
+    clients = [socket.gethostbyname(h) for h in sys.argv[1:]]
+    print(clients)
     d = Delegate(clients)
     d.main()

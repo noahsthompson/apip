@@ -5,7 +5,7 @@ import socket
 import random
 import struct
 
-from scapy.all import srp1, get_if_list, get_if_hwaddr, bind_layers
+from scapy.all import sendp, srp1, get_if_list, get_if_hwaddr, bind_layers
 from scapy.all import Packet
 from scapy.all import Ether
 from scapy.fields import *
@@ -27,12 +27,12 @@ def main():
     # build packet
     acc_quadrants = socket.gethostbyname(sys.argv[3]).split('.')
     pkt =  Ether(src=get_if_hwaddr(iface), dst='ff:ff:ff:ff:ff:ff')
-    pkt = pkt / ApipFlag(flag=ApipFlagNum.PACKET)
+    pkt = pkt / ApipFlag(flag=ApipFlagNum.PACKET.value)
     pkt = pkt / Apip(accAddr='.'.join(acc_quadrants[:2]), retAddr='.'.join(acc_quadrants[2:]), dstAddr=dst)
     
     # send brief
     brf = Ether(src=get_if_hwaddr(iface), dst='ff:ff:ff:ff:ff:ff')
-    brf = brf / ApipFlag(flag=ApipFlagNum.BRIEF)
+    brf = brf / ApipFlag(flag=ApipFlagNum.BRIEF.value)
     brf = brf / Brief(host_id=sys.argv[1], bloom=0)
     
     sendp(pkt)
@@ -41,4 +41,5 @@ def main():
     # print_pkt(pkt[0][1])    
 
 if __name__ == '__main__':
+    print(sys.argv)
     main()
