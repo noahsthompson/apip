@@ -187,6 +187,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             NoAction;
         }
         key = {
+            hdr.apip_flag.flag: exact;
             hdr.apip.dstAddr: lpm;
         }
         size = 1024;
@@ -199,6 +200,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             NoAction;
         }
         key = {
+            hdr.apip_flag.flag: exact;
             meta.ingress_metadata.nhop_apip: exact;
         }
         size = 512;
@@ -206,20 +208,27 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     }
 
     apply {
-        if (hdr.apip.isValid()) {
+        if (hdr.apip.isValid()) { // normal apip message
             calculate_fingerprint();
             check_bloom();
-            if(contains){
+            if(contains){ // either forward
                 apip_lpm.apply();
                 forward.apply();
             }
-            else{
+            else{ // or request a verification
                 get_signature();
                 send_verification_request();
             }
         }
-        if (hdr.verify.isValid()){
+        else if (hdr.verify.isValid()){ //receiving verify request
             update_bloom(1);
+        }
+        else if (hdr.brief.isValid()){ //forwarding a briefing
+            apip_lpm.apply();
+            forward.apply();
+        }
+        else if (hdr.apip_flag.flag == 5){ //shutoff a flow
+            update_bloom(0);
         }
     }
 }
@@ -244,7 +253,8 @@ control MyEgress(inout headers hdr, inout metadata meta, inout standard_metadata
         default_action = _drop();
     }
     apply {
-        if ((hdr.apip_flag.flag == 1) || (hdr.apip_flag.flag == 3)) {
+        //Range 1-3 are forwarded (4 and 5 are never sent)
+        if ((hdr.apip_flag.flag >= 1) && (hdr.apip_flag.flag <= 3)) {
           send_frame.apply();
         }
     }
@@ -258,8 +268,10 @@ control MyDeparser(packet_out packet, in headers hdr) {
     apply { 
         packet.emit(hdr.ethernet);
         packet.emit(hdr.apip_flag);
+
         packet.emit(hdr.apip);
         packet.emit(hdr.verify);
+        packet.emit(hdr.brief);
     }
 }
 
