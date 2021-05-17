@@ -68,15 +68,20 @@ def print_pkt(pkt):
     sys.stdout.flush()
 
 class Delegate(object):
-    BRIEF_PERIOD = 30
+    BRIEF_PERIOD = 30.0
 
     def __init__(self, clients):
         self.clients = set(clients)
         self.assigned_sids = {} # map: clientID -> set/list of sids
         self.briefs = {} # map: clientID -> set of bloom filters
-        self.timers = {} # map: clientID -> set of timers
+        self.timers = {} # map: clientID -> timer
         self.blocked = set() # set of flow identifiers (client_id, dst_ip, client_sid, dst_sid)
         self.iface = get_if()
+
+    def brief_timeout(self, client_id):
+        print('Timer expired: Removing host %s' % client_id)
+        del self.briefs[client_id]
+        del self.timers[client_id]
 
     def send_drop_flow(self, pkt):
         drop_flow = Apip() # TODO: define drop_flow
@@ -99,12 +104,21 @@ class Delegate(object):
         if flag == ApipFlagNum.BRIEF.value:
             brief = pkt[Brief]
             # TODO: check client valid (bootstrapping)
+
+            # reset timer
+            host_id = brief.host_id
+            if host_id in self.timers:
+                self.timers[host_id].cancel()
+            timer = Timer(Delegate.BRIEF_PERIOD, self.brief_timeout, [host_id])
+            self.timers[host_id] = timer
+            timer.start()
+
+            # save brief
             bloom_filter = brief.bloom
-            blooms_frm_host = self.briefs.get(brief.host_id, set())
+            blooms_frm_host = self.briefs.get(host_id, set())
             blooms_frm_host.add(bloom_filter)
-            self.briefs[brief.host_id] = blooms_frm_host
-            print('Added brief from host %s' % brief.host_id)
-            # TODO: set 30s timeout action
+            self.briefs[host_id] = blooms_frm_host
+            print('Added brief from host %s' % host_id)
             return
         
         if flag == ApipFlagNum.VERIFY_REQ.value:
@@ -112,7 +126,7 @@ class Delegate(object):
             # 1. Check delegate has received a brief from client containing Fingerprint(pkt)
             fingerprint = pkt[Verify].fingerprint
             client_id = None
-            print('Checking self.briefs = %s' % self.briefs)
+            print('Checking received briefs = %s' % self.briefs)
             for k,v in self.briefs.items():
                 if fingerprint in v:
                     client_id = k
