@@ -29,14 +29,19 @@ def main():
 
     # build packet
     acc_quadrants = socket.gethostbyname(sys.argv[3]).split('.')
+    accAddr = half_addr_to_long(acc_quadrants[:2])
+    retAddr = half_addr_to_long(acc_quadrants[2:])
     pkt =  Ether(src=get_if_hwaddr(iface), dst='ff:ff:ff:ff:ff:ff')
     pkt = pkt / ApipFlag(flag=ApipFlagNum.PACKET.value)
-    pkt = pkt / Apip(accAddr=half_addr_to_long(acc_quadrants[:2]), retAddr=half_addr_to_long(acc_quadrants[2:]), dstAddr=dst)
+    pkt = pkt / Apip(accAddr=accAddr, retAddr=retAddr, dstAddr=dst)
     
     # send brief
+    dst = struct.unpack("!L", socket.inet_aton(dst))[0]
+    pkt_fingerprint = str(retAddr).encode() + str(dst).encode()
+    print(pkt_fingerprint)
     brf = Ether(src=get_if_hwaddr(iface), dst='ff:ff:ff:ff:ff:ff')
     brf = brf / ApipFlag(flag=ApipFlagNum.BRIEF.value)
-    brf = brf / Brief(host_id=int(src.split('.')[2]) + 1, bloom=0)
+    brf = brf / Brief(host_id=int(src.split('.')[2]) + 1, bloom=int(pkt_fingerprint))
 
     sendp(brf)
     sendp(pkt)
