@@ -83,7 +83,7 @@ class Delegate(object):
         send(resp, verbose=False)
 
     def respond_pkt(self, pkt):
-        print_pkt('PACKET RECEIVED')
+        print('PACKET RECEIVED')
         if not isApip(pkt):
             return
         print_pkt(pkt[0][1])

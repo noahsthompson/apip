@@ -116,6 +116,11 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         hdr.ethernet.dstAddr = dmac;
     }
 
+    action fwd_brief(bit<48> dmac, bit<9> port){
+        hdr.ethernet.dstAddr = dmac;
+        standard_metadata.egress_spec = port;
+    }
+
     action send_verification_request(){
         hdr.apip.setInvalid();
         hdr.verify.setValid();
@@ -124,6 +129,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         hdr.verify.fingerprint = fingerprint;
         hdr.verify.msg_auth = signature;
         
+        standard_metadata.egress_spec = 2; //hardcoded for now, extract from accAddr or use table
         hdr.ethernet.dstAddr = (bit<48>) hdr.apip.accAddr;
     }
 
@@ -209,7 +215,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     table brief {
         actions = {
             _drop;
-            set_dmac;
+            fwd_brief;
             NoAction;
         }
         key = {
