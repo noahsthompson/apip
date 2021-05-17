@@ -36,12 +36,11 @@ def main():
     # send brief
     brf = Ether(src=get_if_hwaddr(iface), dst='ff:ff:ff:ff:ff:ff')
     brf = brf / ApipFlag(flag=ApipFlagNum.BRIEF.value)
-    brf = brf / Brief(host_id=int(src.split('.')[2]), bloom=0)
-    
+    brf = brf / Brief(host_id=int(src.split('.')[2]) + 1, bloom=0)
+
     sendp(brf)
     sendp(pkt)
     # pkt = srp1(pkt, iface=iface, verbose=False)
-    # print_pkt(pkt[0][1])    
 
 if __name__ == '__main__':
     print(sys.argv)

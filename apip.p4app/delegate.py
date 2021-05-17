@@ -45,6 +45,9 @@ class Verify(Packet):
    ]
 
 bind_layers(Ether, ApipFlag, type=0x87DD)
+bind_layers(ApipFlag, Apip, flag=1)
+bind_layers(ApipFlag, Brief, flag=2)
+bind_layers(ApipFlag, Verify, flag=3)
 
 def get_if():
     ifs=get_if_list()
@@ -73,78 +76,66 @@ class Delegate(object):
         self.briefs = {} # map: clientID -> set of bloom filters
         self.timers = {} # map: clientID -> set of timers
         self.blocked = set() # set of flow identifiers (client_id, dst_ip, client_sid, dst_sid)
+        self.iface = get_if()
 
     def send_drop_flow(self, pkt):
         drop_flow = Apip() # TODO: define drop_flow
-        drop_flow = Ether(src=get_if_hwaddr(iface), dst=pkt[Ether].src) / drop_flow
+        drop_flow = Ether(src=get_if_hwaddr(self.iface), dst=pkt[Ether].src) / drop_flow
         send(drop_flow, verbose=False)
 
     def send_verified(self, pkt):
         resp = Verify(fingerprint=pkt[Verify].fingerprint, msg_auth=pkt[Verify].msg_auth)
-        resp = ApipFlag(flag=pkt[ApipFlag].flag) / resp
-        resp = Ether(src=get_if_hwaddr(iface), dst=pkt[Ether].src) / resp
+        resp = ApipFlag(flag=ApipFlagNum.VERIFY_RES.value) / resp
+        resp = Ether(src=get_if_hwaddr(self.iface), dst=pkt[Ether].src) / resp
         send(resp, verbose=False)
 
-    def _get_layers(self,pkt):
-        counter = 0
-        while True:
-            layer = pkt.getlayer(counter)
-            if layer is None:
-                break
-
-            yield layer
-            counter += 1
-
     def respond_pkt(self, pkt):
-        for l in self._get_layers(pkt):
-            print(l.name)
+        if not pkt.haslayer(ApipFlag):
+            return
+
         print_pkt(pkt)
-        
         flag = pkt[ApipFlag].flag
 
         if flag == ApipFlagNum.BRIEF.value:
-            brief = Brief(pkt[Raw].load)
+            brief = pkt[Brief]
             # TODO: check client valid (bootstrapping)
             bloom_filter = brief.bloom
-            self.briefs[brief.host_id].add(bloom_filter)
+            blooms_frm_host = self.briefs.get(brief.host_id, set())
+            blooms_frm_host.add(bloom_filter)
+            self.briefs[brief.host_id] = blooms_frm_host
+            print('Added brief from host %s' % brief.host_id)
             # TODO: set 30s timeout action
             return
         
         if flag == ApipFlagNum.VERIFY_REQ.value:
-            verify = Verify(pkt[Raw].load)
-            self.send_verified(verify) # FOR TESTING
+            self.send_verified(pkt) # FOR TESTING
             # 1. Check delegate has received a brief from client containing Fingerprint(pkt)
             fingerprint = pkt[Verify].fingerprint
             client_id = None
-            for k,v in self.briefs:
+            print('Checking self.briefs = %s' % self.briefs)
+            for k,v in self.briefs.items():
                 if fingerprint in v:
                     client_id = k
                     
-            if client_id is None:
-                self.send_drop_flow(pkt)
-                return
-            # 2. Check accAddr in pkt is using an SID assigned to client
-            # TODO: get client_sid
-            if client_sid not in self.assigned_sids[client_id]:
-                self.send_drop_flow(pkt)
-                return
-            # 3. Check transmission from S to R has not been blocked via a shutoff
-            if flow_id in self.blocked:
-                self.send_drop_flow(pkt)
+            if (client_id is None # TODO: get client_sid
+                or client_sid not in self.assigned_sids[client_id] # 2. Check accAddr in pkt is using an SID assigned to client
+                or flow_id in self.blocked # 3. Check transmission from S to R has not been blocked via a shutoff
+            ):
+                print('Fingerprint invalid: Ignored')
                 return
 
             # Return copy of the verification packet signed with private key to verifier V (V will add S -> R to its whitelist).
             # same fingerprint, key = something
             self.send_verified(pkt)
+            print('Sent verification reply')
 
         if flag == ApipFlagNum.SHUTOFF.value:
             self.blocked.add(flow_id)
 
     def main(self):
-        iface = get_if()
         while True:
             print('sniffing')
-            sniff(iface=iface, prn=self.respond_pkt)
+            sniff(iface=self.iface, prn=self.respond_pkt)
 
 if __name__ == '__main__':
     clients = [socket.gethostbyname(h) for h in sys.argv[1:]]
