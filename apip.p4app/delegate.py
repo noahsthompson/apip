@@ -7,10 +7,11 @@ import struct
 from enum import Enum
 from threading import Timer
 
-from scapy.all import srp1, sniff, get_if_list, get_if_hwaddr, bind_layers
-from scapy.all import Packet
-from scapy.all import Ether
-from scapy.fields import *
+# from scapy.all import srp1, sniff, get_if_list, get_if_hwaddr, bind_layers
+# from scapy.all import Packet
+# from scapy.all import Ether
+# from scapy.fields import *
+from scapy.all import *
 import readline
 
 
@@ -47,6 +48,7 @@ bind_layers(Ether, ApipFlag, type=0x87DD)
 
 def get_if():
     ifs=get_if_list()
+    print(ifs)
     iface=None
     for i in get_if_list():
         if "eth0" in i:
@@ -58,6 +60,7 @@ def get_if():
     return iface
 
 def print_pkt(pkt):
+    pkt = pkt[0][1]
     pkt.show2()
     sys.stdout.flush()
 
@@ -82,23 +85,34 @@ class Delegate(object):
         resp = Ether(src=get_if_hwaddr(iface), dst=pkt[Ether].src) / resp
         send(resp, verbose=False)
 
-    def respond_pkt(self, pkt):
-        print('PACKET RECEIVED')
-        if not isApip(pkt):
-            return
-        print_pkt(pkt[0][1])
-        self.send_verified(pkt) # FOR TESTING
+    def _get_layers(self,pkt):
+        counter = 0
+        while True:
+            layer = pkt.getlayer(counter)
+            if layer is None:
+                break
 
+            yield layer
+            counter += 1
+
+    def respond_pkt(self, pkt):
+        for l in self._get_layers(pkt):
+            print(l.name)
+        print_pkt(pkt)
+        
         flag = pkt[ApipFlag].flag
 
         if flag == ApipFlagNum.BRIEF.value:
+            brief = Brief(pkt[Raw].load)
             # TODO: check client valid (bootstrapping)
-            bloom_filter = pkt[Brief].bloom
-            self.briefs[pkt[Brief].host_id].add(bloom_filter)
+            bloom_filter = brief.bloom
+            self.briefs[brief.host_id].add(bloom_filter)
             # TODO: set 30s timeout action
             return
         
         if flag == ApipFlagNum.VERIFY_REQ.value:
+            verify = Verify(pkt[Raw].load)
+            self.send_verified(verify) # FOR TESTING
             # 1. Check delegate has received a brief from client containing Fingerprint(pkt)
             fingerprint = pkt[Verify].fingerprint
             client_id = None
@@ -129,6 +143,7 @@ class Delegate(object):
     def main(self):
         iface = get_if()
         while True:
+            print('sniffing')
             sniff(iface=iface, prn=self.respond_pkt)
 
 if __name__ == '__main__':
