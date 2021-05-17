@@ -129,7 +129,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         hdr.verify.fingerprint = fingerprint;
         hdr.verify.msg_auth = signature;
         
-        standard_metadata.egress_spec = 2; //hardcoded for now, extract from accAddr or use table
+        standard_metadata.egress_spec = 3; //hardcoded for now, extract from accAddr or use table
         hdr.ethernet.dstAddr = (bit<48>) hdr.apip.accAddr;
     }
 
