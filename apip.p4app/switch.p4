@@ -1,6 +1,10 @@
 #include <core.p4>
 #include <v1model.p4>
 
+enum HashAlgorithm {
+    apip_hash
+}
+
 struct ingress_metadata_t {
     bit<32> nhop_apip;
 }
@@ -99,7 +103,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     }
 
     action calculate_fingerprint() {
-        hash(fingerprint, HashAlgorithm.crc32, 64w0x0, {hdr.apip.retAddr, hdr.apip.dstAddr}, 64w0xFFFFFFFFFFFFFFFF);
+        //custom hash
+        fingerprint = (bit<64>) {hdr.apip.retAddr, hdr.apip.dstAddr};
     }
 
     action get_signature(){
