@@ -120,9 +120,11 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         hdr.apip.setInvalid();
         hdr.verify.setValid();
         hdr.apip_flag.flag = 8w0x3;
-        hdr.ethernet.dstAddr = (bit<48>) hdr.apip.accAddr;
+
         hdr.verify.fingerprint = fingerprint;
         hdr.verify.msg_auth = signature;
+        
+        hdr.ethernet.dstAddr = (bit<48>) hdr.apip.accAddr;
     }
 
     action check_bloom(){
@@ -172,7 +174,6 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             val2 = val2 - 1;
             val3 = val3 - 1;
         }
-        
 
         bloom.write(ix1, val1);
         bloom.write(ix2, val2);
@@ -187,7 +188,6 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             NoAction;
         }
         key = {
-            hdr.apip_flag.flag: exact;
             hdr.apip.dstAddr: lpm;
         }
         size = 1024;
@@ -200,10 +200,22 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             NoAction;
         }
         key = {
-            hdr.apip_flag.flag: exact;
             meta.ingress_metadata.nhop_apip: exact;
         }
         size = 512;
+        default_action = _drop();
+    }
+
+    table brief {
+        actions = {
+            _drop;
+            set_dmac;
+            NoAction;
+        }
+        key = {
+            hdr.brief.host_id : exact;
+        }
+        size = 1024;
         default_action = _drop();
     }
 
@@ -224,8 +236,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             update_bloom(1);
         }
         else if (hdr.brief.isValid()){ //forwarding a briefing
-            apip_lpm.apply();
-            forward.apply();
+            brief.apply();
         }
         else if (hdr.apip_flag.flag == 5){ //shutoff a flow
             update_bloom(0);
