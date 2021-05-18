@@ -59,6 +59,7 @@ bind_layers(Ether, ApipFlag, type=0x87DD)
 bind_layers(ApipFlag, Apip, flag=1)
 bind_layers(ApipFlag, Brief, flag=2)
 bind_layers(ApipFlag, Verify, flag=3)
+bind_layers(ApipFlag, Shutoff, flag=6)
 
 def get_if():
     ifs=get_if_list()
@@ -155,6 +156,7 @@ class Delegate(object):
         if flag == ApipFlagNum.SHUTOFF.value:
             fingerprint = pkt[Shutoff].fingerprint
             self.blocked.add(fingerprint)
+            print('Shut off flow associated with fingerprint: %s' % fingerprint)
 
     def main(self):
         while True:
