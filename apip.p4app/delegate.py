@@ -44,7 +44,7 @@ class Verify(Packet):
 class Shutoff(Packet):
    fields_desc = [
        BitField("fingerprint", 0, 64),
-       BitField("msg_auth", 0, 64)
+       BitField("host_sig", 0, 64)
    ]
 
 class Timeout(Packet):
