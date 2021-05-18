@@ -9,12 +9,25 @@ import time
 from scapy.all import *
 import readline
 
-from delegate import ApipFlagNum, ApipFlag, Apip, Brief, get_if, print_pkt
+from delegate import *
 
 bind_layers(Ether, ApipFlag, type=0x87DD)
 
 def half_addr_to_long(lst): # assuming lst has 2 elements
     return 256 * int(lst[0]) + int(lst[1])
+
+def respond_pkt(pkt):
+    print_pkt(pkt)
+    if not pkt.haslayer(Apip):
+        return
+
+    print('Sending Shutoff')
+    dst = struct.unpack("!L", socket.inet_aton(pkt[Apip].dstAddr))[0]
+    pkt_fingerprint = (pkt[Apip].retAddr << 32) | dst
+    sh = Shutoff(fingerprint=pkt_fingerprint, host_sig=0)
+    sh = ApipFlag(flag=ApipFlagNum.SHUTOFF.value) / sh
+    sh = Ether(src=get_if_hwaddr(get_if()), dst='ff:ff:ff:ff:ff:ff') / sh
+    sendp(sh, verbose=False)
 
 def main():
     if len(sys.argv)<4:
@@ -26,7 +39,7 @@ def main():
     is_src = eval(sys.argv[4].capitalize())
 
     if not is_src:
-        sniff(prn=lambda x: x.summary())
+        sniff(prn=respond_pkt)
     else:
         # build packet
         acc_quadrants = socket.gethostbyname(sys.argv[3]).split('.')
@@ -49,5 +62,4 @@ def main():
         sendp(pkt)
 
 if __name__ == '__main__':
-    print(sys.argv)
     main()
