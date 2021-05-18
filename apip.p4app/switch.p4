@@ -212,9 +212,15 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             val3 = val3 + 1;
         }
         else {
-            val1 = val1 - 1;
-            val2 = val2 - 1;
-            val3 = val3 - 1;
+            if(val1 != 0){
+                val1 = val1 - 1;
+            }
+            if(val2 != 0){
+                val2 = val2 - 1;
+            }
+            if(val3 != 0){
+                val3 = val3 - 1;
+            }
         }
 
         bloom.write(ix1, val1);
