@@ -20,7 +20,8 @@ class ApipFlagNum(Enum):
     BRIEF = 2
     VERIFY_REQ = 3
     VERIFY_RES = 4
-    SHUTOFF = 5
+    TIMEOUT = 5
+    SHUTOFF = 6
 
 class ApipFlag(Packet):
    fields_desc = [BitField("flag", 0, 8)]
@@ -42,6 +43,10 @@ class Verify(Packet):
    fields_desc = [
        BitField("fingerprint", 0, 64),
        BitField("msg_auth", 0, 64)
+   ]
+
+class Timeout(Packet):
+   fields_desc = [
    ]
 
 bind_layers(Ether, ApipFlag, type=0x87DD)
@@ -73,15 +78,21 @@ class Delegate(object):
     def __init__(self, clients):
         self.clients = set(clients)
         self.assigned_sids = {} # map: clientID -> set/list of sids
-        self.briefs = {} # map: clientID -> set of bloom filters
+        self.client_to_briefs = {} # map: clientID -> set of fingerprints
+        self.brief_to_client = {} # map: fingerprint -> clientID
         self.timers = {} # map: clientID -> timer
         self.blocked = set() # set of flow identifiers (client_id, dst_ip, client_sid, dst_sid)
         self.iface = get_if()
 
     def brief_timeout(self, client_id):
         print('Timer expired: Removing host %s' % client_id)
-        del self.briefs[client_id]
+        self.brief_to_client = {k:v for k,v in self.brief_to_client.items() if v != client_id}
+        del self.client_to_briefs[client_id]
         del self.timers[client_id]
+        tm = Timeout()
+        tm = ApipFlag(flag=ApipFlagNum.TIMEOUT.value) / tm
+        tm = Ether(src=get_if_hwaddr(self.iface), dst='ff:ff:ff:ff:ff:ff') / tm
+        sendp(tm, verbose=False)
 
     def send_verified(self, pkt):
         resp = Verify(fingerprint=pkt[Verify].fingerprint, msg_auth=pkt[Verify].msg_auth)
@@ -98,8 +109,6 @@ class Delegate(object):
 
         if flag == ApipFlagNum.BRIEF.value:
             brief = pkt[Brief]
-            # TODO: check client valid (bootstrapping)
-
             # reset timer
             host_id = brief.host_id
             if host_id in self.timers:
@@ -127,7 +136,7 @@ class Delegate(object):
                     client_id = k
 
             # Check transmission from S to R has not been blocked via a shutoff  
-            if (flow_id in self.blocked):
+            if (client_id in self.blocked):
                 print('Flow blocked: Dropping')
                 return
 
@@ -135,9 +144,12 @@ class Delegate(object):
             # same fingerprint, key = something
             self.send_verified(pkt)
             print('Sent verification reply')
+            return
 
         if flag == ApipFlagNum.SHUTOFF.value:
-            self.blocked.add(flow_id)
+            client_id = self.brief_to_client.get()
+            if client_id is not None:
+                self.blocked.add(client_id)
 
     def main(self):
         while True:
