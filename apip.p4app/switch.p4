@@ -118,15 +118,23 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         mark_to_drop(standard_metadata);
     }
 
-    action anonymize() {
-        if (hdr.apip.isValid()){
-            hdr.apip.retAddr = 0;
-        }
-    }
-
     action calculate_fingerprint() {
         //custom hash
         fingerprint = ( ( (bit<64>) hdr.apip.retAddr) << 32) | (bit<64>) hdr.apip.dstAddr;
+    }
+
+    action translate_ret(){
+        if(hdr.apip.isValid()){
+            //translate
+            hdr.apip.retAddr = hdr.apip.retAddr; //would normally translate out
+        }
+    }
+
+    action untranslate_dst(){
+        if(hdr.apip.isValid()){
+            //untranslate
+            hdr.apip.dstAddr = hdr.apip.dstAddr; //would normally translate in
+        }
     }
 
     action get_signature(){
@@ -139,9 +147,9 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         standard_metadata.egress_spec = port;
     }
 
-    action set_mac(bit<48> dmac) {
-        hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
-        hdr.ethernet.dstAddr = dmac;
+    action set_mac(bit<48> mac) {
+        //hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
+        hdr.ethernet.dstAddr = mac;
     }
 
     action fwd_delegate(bit<48> dmac, bit<9> port){
@@ -271,7 +279,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             calculate_fingerprint();
             check_bloom();
             if(contains){ // either forward
-                anonymize();
+                translate_ret();
+                untranslate_det();
                 apip_lpm.apply();
                 forward.apply();
             }
