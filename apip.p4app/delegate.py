@@ -49,12 +49,14 @@ class Shutoff(Packet):
 
 class Timeout(Packet):
    fields_desc = [
+       BitField("fingerprint", 0, 64)
    ]
 
 bind_layers(Ether, ApipFlag, type=0x87DD)
 bind_layers(ApipFlag, Apip, flag=1)
 bind_layers(ApipFlag, Brief, flag=2)
 bind_layers(ApipFlag, Verify, flag=3)
+bind_layers(ApipFlag, Timeout, flag=5)
 bind_layers(ApipFlag, Shutoff, flag=6)
 
 def get_if():
