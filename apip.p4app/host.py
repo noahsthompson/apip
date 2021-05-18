@@ -6,10 +6,7 @@ import random
 import struct
 import time
 
-from scapy.all import sendp, srp1, get_if_list, get_if_hwaddr, bind_layers
-from scapy.all import Packet
-from scapy.all import Ether
-from scapy.fields import *
+from scapy.all import *
 import readline
 
 from delegate import ApipFlagNum, ApipFlag, Apip, Brief, get_if, print_pkt
@@ -41,8 +38,7 @@ def main():
         
         # send brief
         dst = struct.unpack("!L", socket.inet_aton(dst))[0]
-        pkt_fingerprint = str(retAddr).encode() + str(dst).encode()
-        print(pkt_fingerprint)
+        pkt_fingerprint = (retAddr << 32) | dst
         brf = Ether(src=get_if_hwaddr(iface), dst='ff:ff:ff:ff:ff:ff')
         brf = brf / ApipFlag(flag=ApipFlagNum.BRIEF.value)
         brf = brf / Brief(host_id=int(src.split('.')[2]) + 1, bloom=int(pkt_fingerprint))
