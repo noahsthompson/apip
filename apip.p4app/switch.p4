@@ -36,6 +36,10 @@ header shutoff_t {
     bit <64> host_sig;
 }
 
+header timeout_t {
+    bit <64> fingerprint;
+}
+
 struct headers {
     ethernet_t ethernet;
     apip_flag_t apip_flag;
@@ -43,6 +47,7 @@ struct headers {
     verify_t verify;
     brief_t brief;
     shutoff_t shutoff;
+    timeout_t timeout;
 } 
 
 struct metadata {
@@ -67,7 +72,7 @@ parser MyParser(packet_in packet, out headers hdr, inout metadata meta, inout st
             8w0x2: parse_brief;
             8w0x3: parse_verify; //verify request
             8w0x4: parse_verify; //verify response
-            // 5: verify timeout (not dealt with)
+            8w0x5: parse_timeout;
             8w0x6: parse_shutoff; //6 shutoff mal flow
             default: accept;    
         }
@@ -80,18 +85,22 @@ parser MyParser(packet_in packet, out headers hdr, inout metadata meta, inout st
     state parse_apip {
         packet.extract(hdr.apip);
         transition accept;
-
     }
-    state parse_verify{
+    
+    state parse_verify {
         packet.extract(hdr.verify);
         transition accept;
-
     }
+
+    state parse_timeout {
+        packet.extract(hdr.timeout);
+        transition accept;
+    }
+
     state parse_shutoff{
         packet.extract(hdr.shutoff);
         transition accept;
     }
-
 }
 
 
@@ -270,10 +279,13 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         else if (hdr.brief.isValid()){ //forwarding a briefing
             brief.apply();
         }
-        else if (hdr.apip_flag.flag == 5){ //shutoff a flow
+        else if (hdr.timeout.isValid()){ //timeout a flow
+            fingerprint = hdr.timeout.fingerprint;
             update_bloom(0);
         }
-        else if (hdr.shutoff.isValid()){
+        else if (hdr.shutoff.isValid()){ //shutoff a flow
+            fingerprint = hdr.shutoff.fingerprint;
+            update_bloom(0);
             shutoff.apply();
         }
     }
