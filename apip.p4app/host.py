@@ -6,10 +6,7 @@ import random
 import struct
 import time
 
-from scapy.all import sendp, srp1, get_if_list, get_if_hwaddr, bind_layers
-from scapy.all import Packet
-from scapy.all import Ether
-from scapy.fields import *
+from scapy.all import *
 import readline
 
 from delegate import ApipFlagNum, ApipFlag, Apip, Brief, get_if, print_pkt

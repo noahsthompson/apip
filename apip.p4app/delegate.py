@@ -7,10 +7,6 @@ import struct
 from enum import Enum
 from threading import Timer
 
-# from scapy.all import srp1, sniff, get_if_list, get_if_hwaddr, bind_layers
-# from scapy.all import Packet
-# from scapy.all import Ether
-# from scapy.fields import *
 from scapy.all import *
 import readline
 
@@ -119,9 +115,9 @@ class Delegate(object):
 
             # save brief
             bloom_filter = brief.bloom
-            blooms_frm_host = self.briefs.get(host_id, set())
+            blooms_frm_host = self.client_to_briefs.get(host_id, set())
             blooms_frm_host.add(bloom_filter)
-            self.briefs[host_id] = blooms_frm_host
+            self.client_to_briefs[host_id] = blooms_frm_host
             print('Added brief from host %s' % host_id)
             return
         
@@ -129,11 +125,7 @@ class Delegate(object):
             self.send_verified(pkt) # FOR TESTING
             # Check delegate has received a brief from client containing Fingerprint(pkt)
             fingerprint = pkt[Verify].fingerprint
-            client_id = None
-            print('Checking received briefs = %s' % self.briefs)
-            for k,v in self.briefs.items():
-                if fingerprint in v:
-                    client_id = k
+            client_id = self.brief_to_client.get(fingerprint)
 
             # Check transmission from S to R has not been blocked via a shutoff  
             if (client_id in self.blocked):
