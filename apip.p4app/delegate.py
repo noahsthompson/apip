@@ -45,6 +45,12 @@ class Verify(Packet):
        BitField("msg_auth", 0, 64)
    ]
 
+class Shutoff(Packet):
+   fields_desc = [
+       BitField("fingerprint", 0, 64),
+       BitField("msg_auth", 0, 64)
+   ]
+
 class Timeout(Packet):
    fields_desc = [
    ]
@@ -136,7 +142,7 @@ class Delegate(object):
                     client_id = k
 
             # Check transmission from S to R has not been blocked via a shutoff  
-            if (client_id in self.blocked):
+            if (fingerprint in self.blocked):
                 print('Flow blocked: Dropping')
                 return
 
@@ -147,9 +153,8 @@ class Delegate(object):
             return
 
         if flag == ApipFlagNum.SHUTOFF.value:
-            client_id = self.brief_to_client.get()
-            if client_id is not None:
-                self.blocked.add(client_id)
+            fingerprint = pkt[Shutoff].fingerprint
+            self.blocked.add(fingerprint)
 
     def main(self):
         while True:
