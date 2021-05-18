@@ -158,6 +158,10 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     }
 
     action send_verification_request(){
+
+        //happens to work for now, but might need a table in more complicated setting
+        standard_metadata.egress_spec = hdr.apip.accAddr; 
+
         hdr.apip.setInvalid();
         hdr.verify.setValid();
         hdr.apip_flag.flag = 8w0x3;
@@ -165,7 +169,6 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         hdr.verify.fingerprint = fingerprint;
         hdr.verify.host_sig = signature;
         
-        standard_metadata.egress_spec = 3; //hardcoded for now, extract from accAddr or use table
         hdr.ethernet.dstAddr = (bit<48>) hdr.apip.accAddr;
     }
 
@@ -212,6 +215,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             val3 = val3 + 1;
         }
         else {
+            // if statements prevent wraparound
             if(val1 != 0){
                 val1 = val1 - 1;
             }
