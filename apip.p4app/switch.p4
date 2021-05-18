@@ -118,6 +118,12 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         mark_to_drop(standard_metadata);
     }
 
+    action anonymize() {
+        if (hdr.apip.isValid()){
+            hdr.apip.retAddr = 0;
+        }
+    }
+
     action calculate_fingerprint() {
         //custom hash
         fingerprint = ( ( (bit<64>) hdr.apip.retAddr) << 32) | (bit<64>) hdr.apip.dstAddr;
@@ -133,7 +139,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         standard_metadata.egress_spec = port;
     }
 
-    action set_dmac(bit<48> dmac) {
+    action set_mac(bit<48> dmac) {
+        hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
         hdr.ethernet.dstAddr = dmac;
     }
 
@@ -222,7 +229,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     }
     table forward {
         actions = {
-            set_dmac;
+            set_mac;
             _drop;
             NoAction;
         }
@@ -264,6 +271,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             calculate_fingerprint();
             check_bloom();
             if(contains){ // either forward
+                anonymize();
                 apip_lpm.apply();
                 forward.apply();
             }
