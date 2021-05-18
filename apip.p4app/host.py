@@ -38,8 +38,7 @@ def main():
         
         # send brief
         dst = struct.unpack("!L", socket.inet_aton(dst))[0]
-        pkt_fingerprint = str(retAddr).encode() + str(dst).encode()
-        print(pkt_fingerprint)
+        pkt_fingerprint = (retAddr << 32) | dst
         brf = Ether(src=get_if_hwaddr(iface), dst='ff:ff:ff:ff:ff:ff')
         brf = brf / ApipFlag(flag=ApipFlagNum.BRIEF.value)
         brf = brf / Brief(host_id=int(src.split('.')[2]) + 1, bloom=int(pkt_fingerprint))

@@ -111,7 +111,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
 
     action calculate_fingerprint() {
         //custom hash
-        fingerprint = (bit<64>) (((bit<32>) hdr.apip.retAddr << 4) | hdr.apip.dstAddr);
+        
+        fingerprint = ( ( (bit<64>) hdr.apip.retAddr) << 32) | (bit<64>) hdr.apip.dstAddr;
     }
 
     action get_signature(){

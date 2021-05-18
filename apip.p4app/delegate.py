@@ -121,25 +121,27 @@ class Delegate(object):
 
             # save brief
             bloom_filter = brief.bloom
+            self.brief_to_client[bloom_filter] = host_id
             blooms_frm_host = self.client_to_briefs.get(host_id, set())
             blooms_frm_host.add(bloom_filter)
             self.client_to_briefs[host_id] = blooms_frm_host
             print('Added brief from host %s' % host_id)
             return
         
-        if flag == ApipFlagNum.VERIFY_REQ.value:
-            self.send_verified(pkt) # FOR TESTING
+        if flag == ApipFlagNum.VERIFY_REQ.value:            
             # Check delegate has received a brief from client containing Fingerprint(pkt)
             fingerprint = pkt[Verify].fingerprint
-            client_id = self.brief_to_client.get(fingerprint)
-
-            # Check transmission from S to R has not been blocked via a shutoff  
-            if (fingerprint in self.blocked):
+            client_id = self.brief_to_client.get(fingerprint)  
+            if client_id is None:
+                print('Unrecognized fingerprint: Dropping')
+                return
+            
+            # Check transmission from S to R has not been blocked via a shutoff
+            if fingerprint in self.blocked:
                 print('Flow blocked: Dropping')
                 return
 
             # Return copy of the verification packet signed with private key to verifier V (V will add S -> R to its whitelist).
-            # same fingerprint, key = something
             self.send_verified(pkt)
             print('Sent verification reply')
             return
