@@ -158,9 +158,8 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     }
 
     action send_verification_request(){
-
         //happens to work for now, but might need a table in more complicated setting
-        standard_metadata.egress_spec = hdr.apip.accAddr; 
+        standard_metadata.egress_spec = (bit<9>) hdr.apip.accAddr + 1;
 
         hdr.apip.setInvalid();
         hdr.verify.setValid();
