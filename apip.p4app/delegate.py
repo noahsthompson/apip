@@ -97,9 +97,6 @@ class Delegate(object):
             tm = ApipFlag(flag=ApipFlagNum.TIMEOUT.value) / tm
             tm = Ether(src=get_if_hwaddr(self.iface), dst='ff:ff:ff:ff:ff:ff') / tm
             sendp(tm, verbose=False)
-        
-        self.brief_to_client = {k:v for k,v in self.brief_to_client.items() if v != client_id}
-        del self.client_to_briefs[client_id]
         del self.timers[client_id]
         
 
@@ -143,7 +140,7 @@ class Delegate(object):
                 print('Unrecognized fingerprint: Dropping')
                 return
             
-            # Check transmission from S to R has not been blocked via a shutoff
+            # Check transmission has not been blocked via a shutoff
             if fingerprint in self.blocked:
                 print('Flow blocked: Dropping')
                 return

@@ -45,8 +45,8 @@ def main():
     else:
         src_quadrants = src.split('.')
         acc_quadrants = socket.gethostbyname(sys.argv[3]).split('.')
-        accAddr = half_addr_to_long(acc_quadrants[2:])
-        retAddr = half_addr_to_long(src_quadrants[2:])
+        accAddr = half_addr_to_long(acc_quadrants[1:3])
+        retAddr = half_addr_to_long(src_quadrants[1:3])
 
         # build packet
         pkt =  Ether(src=get_if_hwaddr(iface), dst='ff:ff:ff:ff:ff:ff')

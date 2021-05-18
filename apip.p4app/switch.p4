@@ -280,7 +280,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             check_bloom();
             if(contains){ // either forward
                 translate_ret();
-                untranslate_det();
+                untranslate_dst();
                 apip_lpm.apply();
                 forward.apply();
             }
