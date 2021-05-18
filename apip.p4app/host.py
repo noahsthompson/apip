@@ -22,11 +22,13 @@ def respond_pkt(pkt):
         return
 
     print('Sending Shutoff')
+    iface = get_if()
     dst = struct.unpack("!L", socket.inet_aton(pkt[Apip].dstAddr))[0]
     pkt_fingerprint = (pkt[Apip].retAddr << 32) | dst
+
     sh = Shutoff(fingerprint=pkt_fingerprint, host_sig=0)
     sh = ApipFlag(flag=ApipFlagNum.SHUTOFF.value) / sh
-    sh = Ether(src=get_if_hwaddr(get_if()), dst='ff:ff:ff:ff:ff:ff') / sh
+    sh = Ether(src=get_if_hwaddr(iface), dst='ff:ff:ff:ff:ff:ff') / sh
     sendp(sh, verbose=False)
 
 def main():
@@ -41,10 +43,12 @@ def main():
     if not is_src:
         sniff(prn=respond_pkt)
     else:
-        # build packet
+        src_quadrants = src.split('.')
         acc_quadrants = socket.gethostbyname(sys.argv[3]).split('.')
-        accAddr = half_addr_to_long(acc_quadrants[:2])
-        retAddr = half_addr_to_long(acc_quadrants[2:])
+        accAddr = half_addr_to_long(acc_quadrants[2:])
+        retAddr = half_addr_to_long(src_quadrants[2:])
+
+        # build packet
         pkt =  Ether(src=get_if_hwaddr(iface), dst='ff:ff:ff:ff:ff:ff')
         pkt = pkt / ApipFlag(flag=ApipFlagNum.PACKET.value)
         pkt = pkt / Apip(accAddr=accAddr, retAddr=retAddr, dstAddr=dst)
@@ -52,6 +56,7 @@ def main():
         # send brief
         dst = struct.unpack("!L", socket.inet_aton(dst))[0]
         pkt_fingerprint = (retAddr << 32) | dst
+        
         brf = Ether(src=get_if_hwaddr(iface), dst='ff:ff:ff:ff:ff:ff')
         brf = brf / ApipFlag(flag=ApipFlagNum.BRIEF.value)
         brf = brf / Brief(host_id=int(src.split('.')[2]) + 1, bloom=int(pkt_fingerprint))
