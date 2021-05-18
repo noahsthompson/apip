@@ -23,12 +23,17 @@ header apip_t {
 
 header verify_t {
     bit <64> fingerprint;
-    bit <64> msg_auth;
+    bit <64> host_sig;
 }
 
 header brief_t {
     bit <48> host_id;
     bit <64> bloom;
+}
+
+header shutoff_t {
+    bit <64> fingerprint;
+    bit <64> host_sig;
 }
 
 struct headers {
@@ -37,7 +42,7 @@ struct headers {
     apip_t apip;
     verify_t verify;
     brief_t brief;
-
+    shutoff_t shutoff;
 } 
 
 struct metadata {
@@ -60,8 +65,10 @@ parser MyParser(packet_in packet, out headers hdr, inout metadata meta, inout st
         transition select (hdr.apip_flag.flag) {
             8w0x1: parse_apip;
             8w0x2: parse_brief;
-            8w0x3: parse_verify;
-            8w0x4: parse_verify;
+            8w0x3: parse_verify; //verify request
+            8w0x4: parse_verify; //verify response
+            // 5: verify timeout (not dealt with)
+            8w0x6: parse_shutoff; //6 shutoff mal flow
             default: accept;    
         }
     }
@@ -79,6 +86,10 @@ parser MyParser(packet_in packet, out headers hdr, inout metadata meta, inout st
         packet.extract(hdr.verify);
         transition accept;
 
+    }
+    state parse_shutoff{
+        packet.extract(hdr.shutoff);
+        transition accept;
     }
 
 }
@@ -117,7 +128,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         hdr.ethernet.dstAddr = dmac;
     }
 
-    action fwd_brief(bit<48> dmac, bit<9> port){
+    action fwd_delegate(bit<48> dmac, bit<9> port){
         hdr.ethernet.dstAddr = dmac;
         standard_metadata.egress_spec = port;
     }
@@ -128,7 +139,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         hdr.apip_flag.flag = 8w0x3;
 
         hdr.verify.fingerprint = fingerprint;
-        hdr.verify.msg_auth = signature;
+        hdr.verify.host_sig = signature;
         
         standard_metadata.egress_spec = 3; //hardcoded for now, extract from accAddr or use table
         hdr.ethernet.dstAddr = (bit<48>) hdr.apip.accAddr;
@@ -216,7 +227,20 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
     table brief {
         actions = {
             _drop;
-            fwd_brief;
+            fwd_delegate;
+            NoAction;
+        }
+        key = {
+            hdr.brief.host_id : exact;
+        }
+        size = 1024;
+        default_action = _drop();
+    }
+
+    table shutoff {
+        actions = {
+            _drop;
+            fwd_delegate;
             NoAction;
         }
         key = {
@@ -248,6 +272,9 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
         }
         else if (hdr.apip_flag.flag == 5){ //shutoff a flow
             update_bloom(0);
+        }
+        else if (hdr.shutoff.isValid()){
+            shutoff.apply();
         }
     }
 }
@@ -291,6 +318,7 @@ control MyDeparser(packet_out packet, in headers hdr) {
         packet.emit(hdr.apip);
         packet.emit(hdr.verify);
         packet.emit(hdr.brief);
+        packet.emit(hdr.shutoff);
     }
 }
 
