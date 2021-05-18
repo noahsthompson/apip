@@ -91,7 +91,7 @@ class Delegate(object):
         print('Timer expired: Removing host %s' % client_id)
         for fingerprint in self.client_to_briefs[client_id]:
             # for each correspondence/"flow", send a timeout message to switch
-            tm = Timeout()
+            tm = Timeout(fingerprint=fingerprint)
             tm = ApipFlag(flag=ApipFlagNum.TIMEOUT.value) / tm
             tm = Ether(src=get_if_hwaddr(self.iface), dst='ff:ff:ff:ff:ff:ff') / tm
             sendp(tm, verbose=False)
