@@ -240,6 +240,7 @@ control MyIngress(inout headers hdr, inout metadata meta, inout standard_metadat
             }
         }
         else if (hdr.verify.isValid()){ //receiving verify request
+            fingerprint = hdr.verify.fingerprint;
             update_bloom(1);
         }
         else if (hdr.brief.isValid()){ //forwarding a briefing
