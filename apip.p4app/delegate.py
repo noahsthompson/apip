@@ -83,16 +83,11 @@ class Delegate(object):
         del self.briefs[client_id]
         del self.timers[client_id]
 
-    def send_drop_flow(self, pkt):
-        drop_flow = Apip() # TODO: define drop_flow
-        drop_flow = Ether(src=get_if_hwaddr(self.iface), dst=pkt[Ether].src) / drop_flow
-        send(drop_flow, verbose=False)
-
     def send_verified(self, pkt):
         resp = Verify(fingerprint=pkt[Verify].fingerprint, msg_auth=pkt[Verify].msg_auth)
         resp = ApipFlag(flag=ApipFlagNum.VERIFY_RES.value) / resp
         resp = Ether(src=get_if_hwaddr(self.iface), dst=pkt[Ether].src) / resp
-        send(resp, verbose=False)
+        sendp(resp, verbose=False)
 
     def respond_pkt(self, pkt):
         if not pkt.haslayer(ApipFlag):
@@ -123,19 +118,17 @@ class Delegate(object):
         
         if flag == ApipFlagNum.VERIFY_REQ.value:
             self.send_verified(pkt) # FOR TESTING
-            # 1. Check delegate has received a brief from client containing Fingerprint(pkt)
+            # Check delegate has received a brief from client containing Fingerprint(pkt)
             fingerprint = pkt[Verify].fingerprint
             client_id = None
             print('Checking received briefs = %s' % self.briefs)
             for k,v in self.briefs.items():
                 if fingerprint in v:
                     client_id = k
-                    
-            if (client_id is None # TODO: get client_sid
-                or client_sid not in self.assigned_sids[client_id] # 2. Check accAddr in pkt is using an SID assigned to client
-                or flow_id in self.blocked # 3. Check transmission from S to R has not been blocked via a shutoff
-            ):
-                print('Fingerprint invalid: Ignored')
+
+            # Check transmission from S to R has not been blocked via a shutoff  
+            if (flow_id in self.blocked):
+                print('Flow blocked: Dropping')
                 return
 
             # Return copy of the verification packet signed with private key to verifier V (V will add S -> R to its whitelist).

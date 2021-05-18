@@ -4,6 +4,7 @@ import sys
 import socket
 import random
 import struct
+import time
 
 from scapy.all import sendp, srp1, get_if_list, get_if_hwaddr, bind_layers
 from scapy.all import Packet
@@ -44,6 +45,8 @@ def main():
     brf = brf / Brief(host_id=int(src.split('.')[2]) + 1, bloom=int(pkt_fingerprint))
 
     sendp(brf)
+    sendp(pkt)
+    time.sleep(5)
     sendp(pkt)
     # pkt = srp1(pkt, iface=iface, verbose=False)
 
